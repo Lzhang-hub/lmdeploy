@@ -842,7 +842,12 @@ Reminder:
                     ret += f'{self.system}{self.knowledge}{self.tools}{tool_prompt}{self.eotools}{self.meta_instruction}{self.eosys}'
         for message in messages:
             role = message['role']
-            content = message['content']
+            if role == 'tool':
+                role='ipython'
+            if 'tool_calls' in message:
+                content = message['tool_calls']
+            else:
+                content = message['content']
             if role == 'assistant' and ('<|python_tag|>' in content
                                         or '</function>' in content):
                 ret += f'{box_map[role]}{content}<|eom_id|>'
