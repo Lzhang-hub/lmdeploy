@@ -111,7 +111,7 @@ class ChatCompletionRequest(BaseModel):
     temperature: Optional[float] = 0.7
     top_p: Optional[float] = 1.0
     tools: Optional[List[Tool]] = Field(default=None, examples=[None])
-    tool_choice: Union[ToolChoice, Literal['auto', 'required','none']] = Field(default='auto', examples=['none'])  # noqa
+    tool_choice: Union[ToolChoice, Literal['auto', 'required','none']] = Field(default='none', examples=['none'])  # noqa
     logprobs: Optional[bool] = False
     top_logprobs: Optional[int] = None
     n: Optional[int] = 1
@@ -136,8 +136,18 @@ class FunctionResponse(BaseModel):
     arguments: str
 
 
+class FunctionStreamResponse(BaseModel):
+    """Function stream response."""
+    arguments: str
+
+class ToolCallStream(BaseModel):
+    """Tool call response."""
+    index: str
+    function: FunctionStreamResponse
+
 class ToolCall(BaseModel):
     """Tool call response."""
+    index: str
     id: str
     type: Literal['function'] = 'function'
     function: FunctionResponse
@@ -147,7 +157,7 @@ class ChatMessage(BaseModel):
     """Chat messages."""
     role: str
     content: str
-    tool_calls: Optional[List[ToolCall]] = Field(default=None, examples=[None])
+    tool_calls: Optional[Union[List[ToolCall], List[ToolCallStream]]] = Field(default=None, examples=[None])
 
 
 class LogProbs(BaseModel):
@@ -196,6 +206,7 @@ class DeltaMessage(BaseModel):
     """Delta messages."""
     role: Optional[str] = None
     content: Optional[str] = None
+    tool_calls: Optional[Union[List[ToolCall], List[ToolCallStream]]] = Field(default=None, examples=[None])
 
 
 class ChatCompletionResponseStreamChoice(BaseModel):
@@ -203,7 +214,7 @@ class ChatCompletionResponseStreamChoice(BaseModel):
     index: int
     delta: DeltaMessage
     logprobs: Optional[ChoiceLogprobs] = None
-    finish_reason: Optional[Literal['stop', 'length']] = None
+    finish_reason: Optional[Literal['stop', 'length','tool_calls']] = None
 
 
 class ChatCompletionStreamResponse(BaseModel):

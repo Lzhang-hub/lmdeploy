@@ -221,8 +221,6 @@ class BaseChatTemplate(BaseModel):
             role = message['role']
             content = message['content']
             ret += f'{box_map[role]}{content}{eox_map[role]}'
-        if len(messages) and messages[-1]['role'] == 'assistant':
-            return ret[:-len(eox_map['assistant'])]  # prefix of response
         ret += f'{self.assistant}'
         return ret
 
@@ -508,14 +506,10 @@ class InternLM2Chat7B(InternLMChat7B):
         for message in messages:
             role = message['role']
             content = message['content']
-            if 'name' in message and message['name'] in name_map:
-                begin = box_map[role].strip(
-                ) + f" name={name_map[message['name']]}\n"
-            else:
-                begin = box_map[role]
+            begin = box_map[role].strip(
+            ) + f" name={name_map[message['name']]}\n" if 'name' in message else box_map[
+                role]
             ret += f'{begin}{content}{eox_map[role]}'
-        if len(messages) and messages[-1]['role'] == 'assistant':
-            return ret[:-len(eox_map['assistant'])]  # prefix of response
         ret += f'{self.assistant}'
         return ret
 
@@ -842,12 +836,9 @@ Reminder:
                     ret += f'{self.system}{self.knowledge}{self.tools}{tool_prompt}{self.eotools}{self.meta_instruction}{self.eosys}'
         for message in messages:
             role = message['role']
-            if role == 'tool':
+            if role=='tool':
                 role='ipython'
-            if 'tool_calls' in message:
-                content = message['tool_calls']
-            else:
-                content = message['content']
+            content = message['content']
             if role == 'assistant' and ('<|python_tag|>' in content
                                         or '</function>' in content):
                 ret += f'{box_map[role]}{content}<|eom_id|>'
@@ -855,11 +846,9 @@ Reminder:
                 ret += f'{box_map[role]}{self.tools}{tool_prompt}{self.eotools}{content}{eox_map[role]}'
             else:
                 ret += f'{box_map[role]}{content}{eox_map[role]}'
+        ret += f'{self.assistant}'
         if sequence_start and not isinstance(messages, str):
             ret = '<|begin_of_text|>' + ret
-        if len(messages) and messages[-1]['role'] == 'assistant':
-            return ret[:-len(eox_map['assistant'])]  # prefix of response
-        ret += f'{self.assistant}'
         return ret
 
     @classmethod
