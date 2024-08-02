@@ -505,6 +505,7 @@ async def chat_completions_v1(request: ChatCompletionRequest,
     async def completion_stream_generator() -> AsyncGenerator[str, None]:
         tmp_prefix_result=""
         first_return=False
+        last_return=False
         name=""
         async for res in result_generator:
             tmp_prefix_result += res.response
@@ -538,13 +539,32 @@ async def chat_completions_v1(request: ChatCompletionRequest,
                             finish_reason=res.finish_reason,
                             logprobs=logprobs)
                     first_return=True
+                elif not last_return:
+                    if tmp_prefix_result.endswith('}</'):
+                        res.response=res.response.split('<')[0]
+                        tool_calls = [
+                            ToolCallStream(index=str(action_id),function=FunctionStreamResponse(arguments=res.response))]
+                        response_json = create_stream_response_json(
+                                index=0,
+                                text=res.response,
+                                tool_calls=tool_calls,
+                                finish_reason=res.finish_reason,
+                                logprobs=logprobs)
+                        last_return=True
+                    else:
+                        tool_calls = [
+                            ToolCallStream(index=str(action_id),function=FunctionStreamResponse(arguments=res.response))]
+                        response_json = create_stream_response_json(
+                                index=0,
+                                text=res.response,
+                                tool_calls=tool_calls,
+                                finish_reason=res.finish_reason,
+                                logprobs=logprobs)
                 else:
-                    tool_calls = [
-                        ToolCallStream(index=str(action_id),function=FunctionStreamResponse(arguments=res.response))]
                     response_json = create_stream_response_json(
                             index=0,
                             text=res.response,
-                            tool_calls=tool_calls,
+                            tool_calls=None,
                             finish_reason=res.finish_reason,
                             logprobs=logprobs)
             else:
@@ -590,7 +610,7 @@ async def chat_completions_v1(request: ChatCompletionRequest,
             text, action_id, name, parameters = VariableInterface.async_engine.parse_tool_response(  # noqa
                 text, request.tools)
             tool_calls = [
-                ToolCall(id=str(action_id),
+                ToolCall(index=str(action_id),id=str(action_id),
                          function=FunctionResponse(name=name,
                                                    arguments=parameters))
             ]
