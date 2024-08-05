@@ -838,7 +838,11 @@ Reminder:
             role = message['role']
             if role=='tool':
                 role='ipython'
-            content = message['content']
+            if "tool_calls" in message:
+                for tool_call in message['tool_calls']:
+                    content=f'<function={tool_call["function"]["name"]}>{tool_call["function"]["arguments"]}</function>'
+            else:
+                content = message['content']
             if role == 'assistant' and ('<|python_tag|>' in content
                                         or '</function>' in content):
                 ret += f'{box_map[role]}{content}<|eom_id|>'

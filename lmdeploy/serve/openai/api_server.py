@@ -528,25 +528,26 @@ async def chat_completions_v1(request: ChatCompletionRequest,
                     continue
 
                 if not first_return:
+                    fisrt_arguments=tmp_prefix_result.split('>')[1]
                     tool_calls = [
                         ToolCall(index=str(action_id),
                             id=str(action_id),
-                         function=FunctionResponse(name=name,arguments=""))]
+                         function=FunctionResponse(name=name,arguments=fisrt_arguments))]
                     response_json = create_stream_response_json(
                             index=0,
-                            text=tmp_prefix_result,
+                            text='',
                             tool_calls=tool_calls,
                             finish_reason=res.finish_reason,
                             logprobs=logprobs)
                     first_return=True
                 elif not last_return:
                     if tmp_prefix_result.endswith('}</'):
-                        res.response=res.response.split('<')[0]
+                        tool_response=res.response.split('<')[0]
                         tool_calls = [
-                            ToolCallStream(index=str(action_id),function=FunctionStreamResponse(arguments=res.response))]
+                            ToolCallStream(index=str(action_id),function=FunctionStreamResponse(arguments=tool_response))]
                         response_json = create_stream_response_json(
                                 index=0,
-                                text=res.response,
+                                text='',
                                 tool_calls=tool_calls,
                                 finish_reason=res.finish_reason,
                                 logprobs=logprobs)
@@ -556,14 +557,14 @@ async def chat_completions_v1(request: ChatCompletionRequest,
                             ToolCallStream(index=str(action_id),function=FunctionStreamResponse(arguments=res.response))]
                         response_json = create_stream_response_json(
                                 index=0,
-                                text=res.response,
+                                text='',
                                 tool_calls=tool_calls,
                                 finish_reason=res.finish_reason,
                                 logprobs=logprobs)
                 else:
                     response_json = create_stream_response_json(
                             index=0,
-                            text=res.response,
+                            text=None,
                             tool_calls=None,
                             finish_reason=res.finish_reason,
                             logprobs=logprobs)
