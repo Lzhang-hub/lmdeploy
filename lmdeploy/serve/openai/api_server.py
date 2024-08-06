@@ -110,7 +110,7 @@ def create_error_response(status: HTTPStatus, message: str):
     return JSONResponse(
         ErrorResponse(message=message,
                       type='invalid_request_error',
-                      code=status.value).model_dump())
+                      code=status.value).model_dump(),status_code=status.value)
 
 
 async def check_request(request) -> Optional[JSONResponse]:
@@ -508,6 +508,9 @@ async def chat_completions_v1(request: ChatCompletionRequest,
         last_return=False
         name=""
         async for res in result_generator:
+            if res.finish_reason=='out_session':
+                yield create_error_response(HTTPStatus.BAD_REQUEST, 
+                                      f'Input token len + max_new_tokens is too large:{res.input_token_len+gen_config.max_new_tokens} this model supports at most session len: {res.session_len}.')
             tmp_prefix_result += res.response
             logprobs = None
             if gen_logprobs and res.logprobs:
@@ -595,6 +598,9 @@ async def chat_completions_v1(request: ChatCompletionRequest,
                 request.session_id)
             return create_error_response(HTTPStatus.BAD_REQUEST,
                                          'Client disconnected')
+        if res.finish_reason=='out_session':
+            return create_error_response(HTTPStatus.BAD_REQUEST, 
+                                    f'Input token len + max_new_tokens is too large:{res.input_token_len+gen_config.max_new_tokens} this model supports at most session len: {res.session_len}.')
         final_res = res
         text += res.response
         if res.token_ids:

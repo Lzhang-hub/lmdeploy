@@ -67,7 +67,8 @@ class GenOut:
     history_token_len: int
     input_token_len: int
     generate_token_len: int
-    finish_reason: Optional[Literal['stop', 'length']] = None
+    finish_reason: Optional[Literal['stop', 'length','out_session']] = None
+    session_len: int = None
     token_ids: List[int] = None
     logprobs: List[Dict[int, float]] = None
 
@@ -608,7 +609,7 @@ class AsyncEngine(LogitsMixin):
                 input_ids) + gen_config.max_new_tokens > self.session_len:
             logger.error(f'run out of tokens. session_id={session_id}.')
             yield GenOut('', self.id2step[str(session_id)], len(input_ids), 0,
-                         'length')
+                         'out_session',self.session_len)
             if sequence_end is True and sequence_start is False:
                 await self.end_session(session_id)
         else:
@@ -646,7 +647,7 @@ class AsyncEngine(LogitsMixin):
                     # response, history token len,
                     # input token len, gen token len
                     yield GenOut(response, self.id2step[str(session_id)],
-                                 len(input_ids), tokens, finish_reason, res,
+                                 len(input_ids), tokens, finish_reason,self.session_len,res,
                                  logprobs)
 
                 finish_reason = 'length' \
@@ -656,7 +657,7 @@ class AsyncEngine(LogitsMixin):
                 if not response.endswith('�'):
                     response = ''  # avaid returning the last response twice
                 yield GenOut(response, self.id2step[str(session_id)],
-                             len(input_ids), tokens, finish_reason)
+                             len(input_ids), tokens, finish_reason,self.session_len)
                 # update step
                 self.id2step[str(session_id)] += len(input_ids) + tokens
                 if sequence_end:
