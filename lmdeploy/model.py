@@ -882,6 +882,7 @@ class Qwen7BChat(BaseChatTemplate):
                  separator='\n',
                  stop_words=['<|im_end|>'],
                  **kwargs):
+        tools_pre="You are a helpful assistant with access to the following functions. Use them if required -\n"
         super().__init__(system=system,
                          meta_instruction=meta_instruction,
                          eosys=eosys,
@@ -892,7 +893,53 @@ class Qwen7BChat(BaseChatTemplate):
                          separator=separator,
                          stop_words=stop_words,
                          **kwargs)
+        self.tools_pre=tools_pre
 
+        
+    def messages2prompt(self, messages, sequence_start=True, **kwargs):
+        """Return the prompt that is concatenated with other elements in the
+        chat template.
+
+        Args:
+            messages (str | List): user's input prompt
+        Returns:
+            str: the concatenated prompt
+        """
+        if isinstance(messages, str):
+            return self.get_prompt(messages, sequence_start)
+        box_map = dict(user=self.user,
+                       assistant=self.assistant,
+                       system=self.system)
+        eox_map = dict(user=self.eoh,
+                       assistant=self.eoa + self.separator,
+                       system=self.eosys)
+        ret = ''
+        tools=kwargs.get('tools')
+        if self.meta_instruction is not None and sequence_start:
+            if len(messages) and messages[0]['role'] != 'system':
+                ret += f'{self.system}{self.meta_instruction}{self.eosys}'
+
+        # converstion_len=len(messages)
+        first_user=False
+        for i, message in enumerate(messages):
+            role = message['role']
+            if  (i==0 or i==1) and role=='user':
+                first_user=True
+            if role=='tool':
+                role='user'
+
+            content = message['content']
+            if first_user and tools!=None:
+                content=self.tools_pre+json.dumps(tools)+"\n\n"+content
+                first_user=False
+            if "tool_calls" in message:
+                for tool_call in message['tool_calls']:
+                    content=f'<functioncall> {json.dumps(tool_call["function"])}'
+
+            ret += f'{box_map[role]}{content}{eox_map[role]}'
+        ret += f'{self.assistant}'
+        return ret
+    
     @classmethod
     def match(cls, model_path: str) -> Optional[str]:
         """Return the model_name that was registered to MODELS.
@@ -1711,5 +1758,4 @@ def best_match_model(query: str) -> Optional[str]:
     for name, model in MODELS.module_dict.items():
         if model.match(query):
             return model.match(query)
-    logger.warn(f'Did not find a chat template matching {query}.')
     return 'base'

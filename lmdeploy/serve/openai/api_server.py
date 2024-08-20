@@ -2,8 +2,9 @@
 import asyncio
 import copy
 import os
-import re
+import json
 import time
+import dataclasses
 from http import HTTPStatus
 from typing import AsyncGenerator, Dict, List, Literal, Optional, Union
 
@@ -18,6 +19,7 @@ from lmdeploy.messages import (GenerationConfig, PytorchEngineConfig,
                                TurbomindEngineConfig)
 from lmdeploy.model import ChatTemplateConfig
 from lmdeploy.serve.async_engine import AsyncEngine
+from lmdeploy.serve.async_engine import GenOut
 from lmdeploy.serve.openai.protocol import (  # noqa: E501
     ChatCompletionRequest, ChatCompletionRequestQos, ChatCompletionResponse,
     ChatCompletionResponseChoice, ChatCompletionResponseStreamChoice,
@@ -28,7 +30,7 @@ from lmdeploy.serve.openai.protocol import (  # noqa: E501
     EmbeddingsRequest, EncodeRequest, EncodeResponse, ErrorResponse,
     FunctionResponse, FunctionStreamResponse,GenerateRequest, GenerateRequestQos, GenerateResponse,
     LogProbs, ModelCard, ModelList, ModelPermission, ToolCall, TopLogprob,
-    UsageInfo,ToolCallStream)
+    UsageInfo,ToolCallStream,FunctionResponseDict,ToolCallDict)
 from lmdeploy.serve.qos_engine.qos_engine import QosEngine
 from lmdeploy.tokenizer import DetokenizeState, Tokenizer
 from lmdeploy.utils import get_logger
@@ -43,6 +45,14 @@ class VariableInterface:
     api_keys: Optional[List[str]] = None
     qos_engine: QosEngine = None
     request_hosts = []
+
+@dataclasses.dataclass
+class UnmarshalRes:
+    response_json: str
+    first_return: bool
+    last_return: bool
+    name: str
+    action_id: int
 
 
 app = FastAPI(docs_url='/')
@@ -501,12 +511,125 @@ async def chat_completions_v1(request: ChatCompletionRequest,
         response_json = response.model_dump_json()
 
         return response_json
+        
+    def unmarshal_llama3_1_tool(res,tmp_prefix_result,first_return,last_return,name,action_id,logprobs):
+        if res.finish_reason == 'stop':
+            res.finish_reason = 'tool_calls'
+        
+        if '<function=' in tmp_prefix_result and '>{' in tmp_prefix_result:   
+            if name=="":
+                name = tmp_prefix_result.split('<function=')[1].split('>{')[0]
+                action_id = [tool.function.name for tool in request.tools].index(name)
+        else:
+            return None
 
+        if not first_return:
+            fisrt_arguments=tmp_prefix_result.split('>')[1]
+            tool_calls = [
+                ToolCall(index=str(action_id),
+                    id=str(action_id),
+                    function=FunctionResponse(name=name,arguments=fisrt_arguments))]
+            response_json = create_stream_response_json(
+                    index=0,
+                    text='',
+                    tool_calls=tool_calls,
+                    finish_reason=res.finish_reason,
+                    logprobs=logprobs)
+            first_return=True
+        elif not last_return:
+            if tmp_prefix_result.endswith('}</'):
+                tool_response=res.response.split('<')[0]
+                tool_calls = [
+                    ToolCallStream(index=str(action_id),function=FunctionStreamResponse(arguments=tool_response))]
+                response_json = create_stream_response_json(
+                        index=0,
+                        text='',
+                        tool_calls=tool_calls,
+                        finish_reason=res.finish_reason,
+                        logprobs=logprobs)
+                last_return=True
+            else:
+                tool_calls = [
+                    ToolCallStream(index=str(action_id),function=FunctionStreamResponse(arguments=res.response))]
+                response_json = create_stream_response_json(
+                        index=0,
+                        text='',
+                        tool_calls=tool_calls,
+                        finish_reason=res.finish_reason,
+                        logprobs=logprobs)
+        else:
+            response_json = create_stream_response_json(
+                    index=0,
+                    text=None,
+                    tool_calls=None,
+                    finish_reason=res.finish_reason,
+                    logprobs=logprobs)
+        return UnmarshalRes(response_json,first_return,last_return,name)
+
+    def unmarshal_qwen2_tool(res,tmp_prefix_result,first_return,last_return,name,action_id,logprobs):
+        if res.finish_reason == 'stop':
+            res.finish_reason = 'tool_calls'
+        
+        # <functioncall> {"name": "check_email_availability", 
+        if '<functioncall> ' in tmp_prefix_result and 'arguments' in tmp_prefix_result:   
+            if name=="":
+                name = tmp_prefix_result.split('<functioncall> {"name": "')[1].split('", ')[0]
+                # name = json.loads(name_json_str)['name']
+                action_id = [tool.function.name for tool in request.tools].index(name)
+        else:
+            return None
+        
+        if not first_return:
+            # fisrt_arguments=tmp_prefix_result.split('>')[1]
+            tool_calls = [
+                ToolCall(index=str(action_id),
+                    id=str(action_id),
+                    function=FunctionResponse(name=name,arguments=""))]
+            response_json = create_stream_response_json(
+                    index=0,
+                    text='',
+                    tool_calls=tool_calls,
+                    finish_reason=res.finish_reason,
+                    logprobs=logprobs)
+            first_return=True
+        else:
+            if tmp_prefix_result.endswith('}}'):
+                tool_response=res.response.replace("}}", "}")
+                tool_calls = [
+                    ToolCallStream(index=str(action_id),function=FunctionStreamResponse(arguments=tool_response))]
+                response_json = create_stream_response_json(
+                        index=0,
+                        text='',
+                        tool_calls=tool_calls,
+                        finish_reason=res.finish_reason,
+                        logprobs=logprobs)
+                last_return=True
+            else:
+                if tmp_prefix_result.endswith('"arguments":'):
+                    res.response=""
+                tool_calls = [
+                    ToolCallStream(index=str(action_id),function=FunctionStreamResponse(arguments=res.response))]
+                response_json = create_stream_response_json(
+                        index=0,
+                        text='',
+                        tool_calls=tool_calls,
+                        finish_reason=res.finish_reason,
+                        logprobs=logprobs)
+        return UnmarshalRes(response_json,first_return,last_return,name,action_id)
+  
     async def completion_stream_generator() -> AsyncGenerator[str, None]:
         tmp_prefix_result=""
-        first_return=False
-        last_return=False
-        name=""
+        init_unmarshal=UnmarshalRes("",False,False,"",None)
+
+        # set tool stream unmarshal function according to TOOL_TEMPLATE_TYPE
+        tool_template_type=os.getenv('TOOL_TEMPLATE_TYPE')
+        if tool_template_type!='' and tool_template_type not in ["llama3_1","qwen2"]:
+            yield create_error_response(HTTPStatus.BAD_REQUEST, "TOOL_TEMPLATE_TYPE must be llama3_1 or qwen2")
+        if tool_template_type=="llama3_1":
+            unmarshal_func=unmarshal_llama3_1_tool
+        elif tool_template_type=="qwen2":
+            unmarshal_func=unmarshal_qwen2_tool
+
         async for res in result_generator:
             if res.finish_reason=='out_session':
                 yield create_error_response(HTTPStatus.BAD_REQUEST, 
@@ -519,58 +642,69 @@ async def chat_completions_v1(request: ChatCompletionRequest,
                     res.logprobs)
             # 第一次返回是返回完整的函数名 "tool_calls":[{'id': '0', 'type': 'function', 'function': {'name': 'get_current_weather'}}]
             # 接下来范每次返回最新结果作为arguments的参数 "tool_calls":[{'function': {"arguments":"{\""}}}]
-            if request.tool_choice != 'none' and tmp_prefix_result.startswith('<'):
-                if res.finish_reason == 'stop':
-                    res.finish_reason = 'tool_calls'
+            # if request.tool_choice != 'none' and tmp_prefix_result.startswith('<'):
+            #     if res.finish_reason == 'stop':
+            #         res.finish_reason = 'tool_calls'
                 
-                if '<function=' in tmp_prefix_result and '>{' in tmp_prefix_result:   
-                    if name=="":
-                        name = tmp_prefix_result.split('<function=')[1].split('>{')[0]
-                        action_id = [tool.function.name for tool in request.tools].index(name)
+            #     if '<function=' in tmp_prefix_result and '>{' in tmp_prefix_result:   
+            #         if name=="":
+            #             name = tmp_prefix_result.split('<function=')[1].split('>{')[0]
+            #             action_id = [tool.function.name for tool in request.tools].index(name)
+            #     else:
+            #         continue
+
+            #     if not first_return:
+            #         fisrt_arguments=tmp_prefix_result.split('>')[1]
+            #         tool_calls = [
+            #             ToolCall(index=str(action_id),
+            #                 id=str(action_id),
+            #              function=FunctionResponse(name=name,arguments=fisrt_arguments))]
+            #         response_json = create_stream_response_json(
+            #                 index=0,
+            #                 text='',
+            #                 tool_calls=tool_calls,
+            #                 finish_reason=res.finish_reason,
+            #                 logprobs=logprobs)
+            #         first_return=True
+            #     elif not last_return:
+            #         if tmp_prefix_result.endswith('}</'):
+            #             tool_response=res.response.split('<')[0]
+            #             tool_calls = [
+            #                 ToolCallStream(index=str(action_id),function=FunctionStreamResponse(arguments=tool_response))]
+            #             response_json = create_stream_response_json(
+            #                     index=0,
+            #                     text='',
+            #                     tool_calls=tool_calls,
+            #                     finish_reason=res.finish_reason,
+            #                     logprobs=logprobs)
+            #             last_return=True
+            #         else:
+            #             tool_calls = [
+            #                 ToolCallStream(index=str(action_id),function=FunctionStreamResponse(arguments=res.response))]
+            #             response_json = create_stream_response_json(
+            #                     index=0,
+            #                     text='',
+            #                     tool_calls=tool_calls,
+            #                     finish_reason=res.finish_reason,
+            #                     logprobs=logprobs)
+            #     else:
+            #         response_json = create_stream_response_json(
+            #                 index=0,
+            #                 text=None,
+            #                 tool_calls=None,
+            #                 finish_reason=res.finish_reason,
+            #                 logprobs=logprobs)
+            
+            if request.tool_choice != 'none' and tmp_prefix_result.startswith('<'):
+                # model_unmarshal_res=unmarshal_llama3_1_tool(res,tmp_prefix_result,unmarshal_res.first_return,unmarshal_res.last_return,unmarshal_res.name,init_unmarshal.action_id,logprobs)
+                
+                model_unmarshal_res=unmarshal_func(res,tmp_prefix_result,init_unmarshal.first_return,init_unmarshal.last_return,init_unmarshal.name,init_unmarshal.action_id,logprobs)
+                # logger.info(model_unmarshal_res)
+                if model_unmarshal_res!=None:
+                    response_json=model_unmarshal_res.response_json
+                    init_unmarshal=model_unmarshal_res
                 else:
                     continue
-
-                if not first_return:
-                    fisrt_arguments=tmp_prefix_result.split('>')[1]
-                    tool_calls = [
-                        ToolCall(index=str(action_id),
-                            id=str(action_id),
-                         function=FunctionResponse(name=name,arguments=fisrt_arguments))]
-                    response_json = create_stream_response_json(
-                            index=0,
-                            text='',
-                            tool_calls=tool_calls,
-                            finish_reason=res.finish_reason,
-                            logprobs=logprobs)
-                    first_return=True
-                elif not last_return:
-                    if tmp_prefix_result.endswith('}</'):
-                        tool_response=res.response.split('<')[0]
-                        tool_calls = [
-                            ToolCallStream(index=str(action_id),function=FunctionStreamResponse(arguments=tool_response))]
-                        response_json = create_stream_response_json(
-                                index=0,
-                                text='',
-                                tool_calls=tool_calls,
-                                finish_reason=res.finish_reason,
-                                logprobs=logprobs)
-                        last_return=True
-                    else:
-                        tool_calls = [
-                            ToolCallStream(index=str(action_id),function=FunctionStreamResponse(arguments=res.response))]
-                        response_json = create_stream_response_json(
-                                index=0,
-                                text='',
-                                tool_calls=tool_calls,
-                                finish_reason=res.finish_reason,
-                                logprobs=logprobs)
-                else:
-                    response_json = create_stream_response_json(
-                            index=0,
-                            text=None,
-                            tool_calls=None,
-                            finish_reason=res.finish_reason,
-                            logprobs=logprobs)
             else:
                 response_json = create_stream_response_json(
                     index=0,
@@ -609,16 +743,19 @@ async def chat_completions_v1(request: ChatCompletionRequest,
             final_logprobs.extend(res.logprobs)
 
     tool_calls = None
+    # logger.info(f'zldebug: {text}')
     if request.tool_choice != 'none' and ('<|plugin|>' in text
-                                          or '<function=' in text):
+                                          or '<function=' in text
+                                          or '<functioncall>' in text):
         if final_res.finish_reason == 'stop':
             final_res.finish_reason = 'tool_calls'
         try:  # TODO add json_schema guidance to turbomind
             text, action_id, name, parameters = VariableInterface.async_engine.parse_tool_response(  # noqa
                 text, request.tools)
+            print(f'zldebug: {type(parameters)}')
             tool_calls = [
-                ToolCall(index=str(action_id),id=str(action_id),
-                         function=FunctionResponse(name=name,
+                ToolCallDict(index=str(action_id),id=str(action_id),
+                         function=FunctionResponseDict(name=name,
                                                    arguments=parameters))
             ]
         except Exception as e:
@@ -1288,6 +1425,7 @@ def serve(model_path: str,
           api_keys: Optional[Union[List[str], str]] = None,
           ssl: bool = False,
           qos_config_path: str = '',
+          tool_template_type: str = '',
           **kwargs):
     """An example to perform model inference through the command line
     interface.
@@ -1330,6 +1468,7 @@ def serve(model_path: str,
     if os.getenv('TM_LOG_LEVEL') is None:
         os.environ['TM_LOG_LEVEL'] = log_level
     logger.setLevel(log_level)
+    os.environ['TOOL_TEMPLATE_TYPE'] = tool_template_type
 
     if allow_origins:
         app.add_middleware(

@@ -133,6 +133,11 @@ class SubCliServe:
                             type=str,
                             default='',
                             help='Qos policy config path')
+        parser.add_argument('--tool-template-type',
+                            type=str,
+                            default='',
+                            help='Tool call unmarshal template type'
+        )
         # common args
         ArgumentHelper.backend(parser)
         ArgumentHelper.log_level(parser)
@@ -310,7 +315,8 @@ class SubCliServe:
                        log_level=args.log_level.upper(),
                        api_keys=args.api_keys,
                        ssl=args.ssl,
-                       qos_config_path=args.qos_config_path)
+                       qos_config_path=args.qos_config_path,
+                       tool_template_type=args.tool_template_type)
 
     @staticmethod
     def api_client(args):
