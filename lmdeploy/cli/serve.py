@@ -138,6 +138,11 @@ class SubCliServe:
                             default='',
                             help='Tool call unmarshal template type'
         )
+        parser.add_argument('--base-model-type',
+                            type=str,
+                            default=None,
+                            help='Base model type'
+        )
         # common args
         ArgumentHelper.backend(parser)
         ArgumentHelper.log_level(parser)
@@ -316,7 +321,8 @@ class SubCliServe:
                        api_keys=args.api_keys,
                        ssl=args.ssl,
                        qos_config_path=args.qos_config_path,
-                       tool_template_type=args.tool_template_type)
+                       tool_template_type=args.tool_template_type,
+                       base_model_type=args.base_model_type)
 
     @staticmethod
     def api_client(args):

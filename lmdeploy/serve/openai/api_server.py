@@ -640,60 +640,6 @@ async def chat_completions_v1(request: ChatCompletionRequest,
                 logprobs = _create_chat_completion_logprobs(
                     VariableInterface.async_engine.tokenizer, res.token_ids,
                     res.logprobs)
-            # 第一次返回是返回完整的函数名 "tool_calls":[{'id': '0', 'type': 'function', 'function': {'name': 'get_current_weather'}}]
-            # 接下来范每次返回最新结果作为arguments的参数 "tool_calls":[{'function': {"arguments":"{\""}}}]
-            # if request.tool_choice != 'none' and tmp_prefix_result.startswith('<'):
-            #     if res.finish_reason == 'stop':
-            #         res.finish_reason = 'tool_calls'
-                
-            #     if '<function=' in tmp_prefix_result and '>{' in tmp_prefix_result:   
-            #         if name=="":
-            #             name = tmp_prefix_result.split('<function=')[1].split('>{')[0]
-            #             action_id = [tool.function.name for tool in request.tools].index(name)
-            #     else:
-            #         continue
-
-            #     if not first_return:
-            #         fisrt_arguments=tmp_prefix_result.split('>')[1]
-            #         tool_calls = [
-            #             ToolCall(index=str(action_id),
-            #                 id=str(action_id),
-            #              function=FunctionResponse(name=name,arguments=fisrt_arguments))]
-            #         response_json = create_stream_response_json(
-            #                 index=0,
-            #                 text='',
-            #                 tool_calls=tool_calls,
-            #                 finish_reason=res.finish_reason,
-            #                 logprobs=logprobs)
-            #         first_return=True
-            #     elif not last_return:
-            #         if tmp_prefix_result.endswith('}</'):
-            #             tool_response=res.response.split('<')[0]
-            #             tool_calls = [
-            #                 ToolCallStream(index=str(action_id),function=FunctionStreamResponse(arguments=tool_response))]
-            #             response_json = create_stream_response_json(
-            #                     index=0,
-            #                     text='',
-            #                     tool_calls=tool_calls,
-            #                     finish_reason=res.finish_reason,
-            #                     logprobs=logprobs)
-            #             last_return=True
-            #         else:
-            #             tool_calls = [
-            #                 ToolCallStream(index=str(action_id),function=FunctionStreamResponse(arguments=res.response))]
-            #             response_json = create_stream_response_json(
-            #                     index=0,
-            #                     text='',
-            #                     tool_calls=tool_calls,
-            #                     finish_reason=res.finish_reason,
-            #                     logprobs=logprobs)
-            #     else:
-            #         response_json = create_stream_response_json(
-            #                 index=0,
-            #                 text=None,
-            #                 tool_calls=None,
-            #                 finish_reason=res.finish_reason,
-            #                 logprobs=logprobs)
             
             if request.tool_choice != 'none' and tmp_prefix_result.startswith('<'):
                 # model_unmarshal_res=unmarshal_llama3_1_tool(res,tmp_prefix_result,unmarshal_res.first_return,unmarshal_res.last_return,unmarshal_res.name,init_unmarshal.action_id,logprobs)
@@ -1426,6 +1372,7 @@ def serve(model_path: str,
           ssl: bool = False,
           qos_config_path: str = '',
           tool_template_type: str = '',
+          base_model_type: str = '',
           **kwargs):
     """An example to perform model inference through the command line
     interface.
@@ -1497,6 +1444,7 @@ def serve(model_path: str,
         backend_config=backend_config,
         chat_template_config=chat_template_config,
         tp=tp,
+        base_model_type=base_model_type,
         **kwargs)
 
     if qos_config_path:

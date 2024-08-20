@@ -159,6 +159,7 @@ class AsyncEngine(LogitsMixin):
                                                 PytorchEngineConfig]] = None,
                  chat_template_config: Optional[ChatTemplateConfig] = None,
                  tp: int = 1,
+                 base_model_type: Optional[str] = None,
                  **kwargs) -> None:
         logger.info(
             f'input backend={backend}, backend_config={backend_config}')
@@ -170,7 +171,10 @@ class AsyncEngine(LogitsMixin):
         if self.model_name in MODELS.module_dict.keys():
             chat_template_name = self.model_name
         else:
-            chat_template_name = best_match_model(model_path)
+            if base_model_type is not None:
+                chat_template_name = best_match_model(base_model_type)
+            else:
+                chat_template_name = best_match_model(model_path)
         if chat_template_config is None:
             chat_template_config = ChatTemplateConfig(chat_template_name)
         elif chat_template_config.model_name is None:

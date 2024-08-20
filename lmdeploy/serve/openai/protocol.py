@@ -135,6 +135,17 @@ class FunctionResponse(BaseModel):
     name: str
     arguments: str
 
+class FunctionResponseDict(BaseModel):
+    """Function response."""
+    name: str
+    arguments: dict
+
+class ToolCallDict(BaseModel):
+    """Tool call response."""
+    index: str
+    id: str
+    type: Literal['function'] = 'function'
+    function: FunctionResponseDict
 
 class FunctionStreamResponse(BaseModel):
     """Function stream response."""
@@ -157,7 +168,7 @@ class ChatMessage(BaseModel):
     """Chat messages."""
     role: str
     content: str
-    tool_calls: Optional[Union[List[ToolCall], List[ToolCallStream]]] = Field(default=None, examples=[None])
+    tool_calls: Optional[Union[List[ToolCall], List[ToolCallStream],List[ToolCallDict]]] = Field(default=None, examples=[None])
 
 
 class LogProbs(BaseModel):
