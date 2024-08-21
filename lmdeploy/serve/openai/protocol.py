@@ -168,7 +168,7 @@ class ChatMessage(BaseModel):
     """Chat messages."""
     role: str
     content: str
-    tool_calls: Optional[Union[List[ToolCall], List[ToolCallStream],List[ToolCallDict]]] = Field(default=None, examples=[None])
+    tool_calls: Optional[Union[List[ToolCall], List[ToolCallStream]]] = Field(default=None, examples=[None])
 
 
 class LogProbs(BaseModel):

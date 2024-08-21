@@ -934,7 +934,10 @@ class Qwen7BChat(BaseChatTemplate):
                 first_user=False
             if "tool_calls" in message:
                 for tool_call in message['tool_calls']:
-                    content=f'<functioncall> {json.dumps(tool_call["function"])}'
+                    content='<functioncall> ' + json.dumps({
+                        "name": tool_call['function']['name'],
+                        "arguments": json.loads(tool_call['function']['arguments'])})
+                    # content= '<functioncall> {"name": '+tool_call["function"]["name"]}'
 
             ret += f'{box_map[role]}{content}{eox_map[role]}'
         ret += f'{self.assistant}'

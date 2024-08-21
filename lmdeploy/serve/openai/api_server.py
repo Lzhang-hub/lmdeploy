@@ -30,7 +30,7 @@ from lmdeploy.serve.openai.protocol import (  # noqa: E501
     EmbeddingsRequest, EncodeRequest, EncodeResponse, ErrorResponse,
     FunctionResponse, FunctionStreamResponse,GenerateRequest, GenerateRequestQos, GenerateResponse,
     LogProbs, ModelCard, ModelList, ModelPermission, ToolCall, TopLogprob,
-    UsageInfo,ToolCallStream,FunctionResponseDict,ToolCallDict)
+    UsageInfo,ToolCallStream,FunctionResponse)
 from lmdeploy.serve.qos_engine.qos_engine import QosEngine
 from lmdeploy.tokenizer import DetokenizeState, Tokenizer
 from lmdeploy.utils import get_logger
@@ -640,7 +640,7 @@ async def chat_completions_v1(request: ChatCompletionRequest,
                 logprobs = _create_chat_completion_logprobs(
                     VariableInterface.async_engine.tokenizer, res.token_ids,
                     res.logprobs)
-            
+
             if request.tool_choice != 'none' and tmp_prefix_result.startswith('<'):
                 # model_unmarshal_res=unmarshal_llama3_1_tool(res,tmp_prefix_result,unmarshal_res.first_return,unmarshal_res.last_return,unmarshal_res.name,init_unmarshal.action_id,logprobs)
                 
@@ -700,8 +700,8 @@ async def chat_completions_v1(request: ChatCompletionRequest,
                 text, request.tools)
             print(f'zldebug: {type(parameters)}')
             tool_calls = [
-                ToolCallDict(index=str(action_id),id=str(action_id),
-                         function=FunctionResponseDict(name=name,
+                ToolCall(index=str(action_id),id=str(action_id),
+                         function=FunctionResponse(name=name,
                                                    arguments=parameters))
             ]
         except Exception as e:

@@ -686,12 +686,12 @@ class AsyncEngine(LogitsMixin):
             name, parameters = action['name'], json.dumps(action['parameters'])
         elif '<function=' in text:  # llama3.1
             action, _ = text.split('</function>')
-            parameters = json.loads(action[action.find('{'):])
+            parameters = json.dumps(json.loads(action[action.find('{'):]))
             name = action.split('<function=')[1].split('>{')[0]
         elif '<functioncall> ' in text: # qwen2-lixia
             _,action=text.split('<functioncall> ')
             name=json.loads(action)['name']
-            parameters=json.loads(action)['arguments']
+            parameters=json.dumps(json.loads(action)['arguments'])
         else:
             raise RuntimeError(f'Unexpected model response: {text}')
         action_id = [tool.function.name for tool in tools].index(name)
