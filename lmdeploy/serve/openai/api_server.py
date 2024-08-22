@@ -625,6 +625,7 @@ async def chat_completions_v1(request: ChatCompletionRequest,
         tool_template_type=os.getenv('TOOL_TEMPLATE_TYPE')
         if tool_template_type!='' and tool_template_type not in ["llama3_1","qwen2"]:
             yield create_error_response(HTTPStatus.BAD_REQUEST, "TOOL_TEMPLATE_TYPE must be llama3_1 or qwen2")
+        unmarshal_func=None
         if tool_template_type=="llama3_1":
             unmarshal_func=unmarshal_llama3_1_tool
         elif tool_template_type=="qwen2":
@@ -641,7 +642,7 @@ async def chat_completions_v1(request: ChatCompletionRequest,
                     VariableInterface.async_engine.tokenizer, res.token_ids,
                     res.logprobs)
 
-            if request.tool_choice != 'none' and tmp_prefix_result.startswith('<'):
+            if request.tool_choice != 'none' and tmp_prefix_result.startswith('<') and unmarshal_func!=None:
                 # model_unmarshal_res=unmarshal_llama3_1_tool(res,tmp_prefix_result,unmarshal_res.first_return,unmarshal_res.last_return,unmarshal_res.name,init_unmarshal.action_id,logprobs)
                 
                 model_unmarshal_res=unmarshal_func(res,tmp_prefix_result,init_unmarshal.first_return,init_unmarshal.last_return,init_unmarshal.name,init_unmarshal.action_id,logprobs)
