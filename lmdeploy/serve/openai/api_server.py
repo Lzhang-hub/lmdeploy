@@ -32,7 +32,7 @@ from lmdeploy.serve.openai.protocol import (  # noqa: E501
     FunctionResponse, FunctionStreamResponse,GenerateRequest, GenerateResponse,
     LogProbs, ModelCard, ModelList, ModelPermission, ToolCall, TopLogprob,
     UsageInfo,ToolCallStream,FunctionResponse)
-from lmdeploy.serve.qos_engine.qos_engine import QosEngine
+# from lmdeploy.serve.qos_engine.qos_engine import QosEngine
 from lmdeploy.tokenizer import DetokenizeState, Tokenizer
 from lmdeploy.utils import get_logger
 
@@ -427,8 +427,7 @@ async def chat_completions_v1(request: ChatCompletionRequest,
             id=request_id,
             created=created_time,
             model=model_name,
-            choices=[choice_data],
-            usage=usage,
+            choices=[choice_data]
         )
         response_json = response.model_dump_json()
 
@@ -563,22 +562,6 @@ async def chat_completions_v1(request: ChatCompletionRequest,
                 logprobs = _create_chat_completion_logprobs(
                     VariableInterface.async_engine.tokenizer, res.token_ids,
                     res.logprobs)
-            if request.stream_options and request.stream_options.include_usage:
-                total_tokens = sum([
-                    res.history_token_len, res.input_token_len,
-                    res.generate_token_len
-                ])
-                usage = UsageInfo(
-                    prompt_tokens=res.input_token_len,
-                    completion_tokens=res.generate_token_len,
-                    total_tokens=total_tokens,
-                )
-            response_json = create_stream_response_json(
-                index=0,
-                text=res.response,
-                finish_reason=res.finish_reason,
-                logprobs=logprobs,
-                usage=usage)
 
             if request.tool_choice != 'none' and tmp_prefix_result.startswith('<') and unmarshal_func!=None:
                 # model_unmarshal_res=unmarshal_llama3_1_tool(res,tmp_prefix_result,unmarshal_res.first_return,unmarshal_res.last_return,unmarshal_res.name,init_unmarshal.action_id,logprobs)
@@ -596,8 +579,7 @@ async def chat_completions_v1(request: ChatCompletionRequest,
                     text=res.response,
                     tool_calls=None,
                     finish_reason=res.finish_reason,
-                    logprobs=logprobs,
-                    usage=usage)
+                    logprobs=logprobs)
             yield f'data: {response_json}\n\n'
         yield 'data: [DONE]\n\n'
 
@@ -1080,6 +1062,7 @@ def serve(model_path: str,
           chat_template_config: Optional[ChatTemplateConfig] = None,
           server_name: str = '0.0.0.0',
           server_port: int = 23333,
+          tp: int = 1,
           allow_origins: List[str] = ['*'],
           allow_credentials: bool = True,
           allow_methods: List[str] = ['*'],
