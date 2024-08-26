@@ -53,7 +53,7 @@ ______________________________________________________________________
 - \[2023/11\] TurboMindの主要なアップグレード、包括的なPaged Attention、シーケンス長制限のない高速なアテンションカーネル、2倍速いKV8カーネル、Split-Kデコーディング（Flash Decoding）、およびsm_75のW4A16推論
 - \[2023/09\] TurboMindはQwen-14Bをサポート
 - \[2023/09\] TurboMindはInternLM-20Bをサポート
-- \[2023/09\] TurboMindはCode Llamaのすべての機能をサポート：コード補完、インフィリング、チャット/インストラクト、Pythonスペシャリスト。デプロイメントガイドは[こちら](./docs/en/supported_models/codellama.md)をクリックしてください
+- \[2023/09\] TurboMindはCode Llamaのすべての機能をサポート：コード補完、インフィリング、チャット/インストラクト、Pythonスペシャリスト。デプロイメントガイドは[こちら](./docs/en/llm/codellama.md)をクリックしてください
 - \[2023/09\] TurboMindはBaichuan2-7Bをサポート
 - \[2023/08\] TurboMindはflash-attention2をサポート
 - \[2023/08\] TurboMindはQwen-7B、動的NTK-RoPEスケーリング、動的logNスケーリングをサポート
@@ -137,6 +137,8 @@ LMDeploy TurboMindエンジンは卓越した推論能力を持ち、さまざ�
   <li>Dbrx (132B)</li>
   <li>StarCoder2 (3B - 15B)</li>
   <li>Phi-3-mini (3.8B)</li>
+  <li>Phi-3.5-mini (3.8B)</li>
+  <li>Phi-3.5-MoE (16x3.8B)</li>
 </ul>
 </td>
 <td>
@@ -152,7 +154,9 @@ LMDeploy TurboMindエンジンは卓越した推論能力を持ち、さまざ�
   <li>CogVLM-Chat (17B)</li>
   <li>CogVLM2-Chat (19B)</li>
   <li>MiniCPM-Llama3-V-2_5</li>
+  <li>MiniCPM-V-2_6</li>
   <li>Phi-3-vision (4.2B)</li>
+  <li>Phi-3.5-vision (4.2B)</li>
   <li>GLM-4V (9B)</li>
 </ul>
 </td>
