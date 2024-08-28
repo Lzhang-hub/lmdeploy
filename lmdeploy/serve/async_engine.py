@@ -3,6 +3,7 @@ import asyncio
 import dataclasses
 import json
 import os
+import re
 import random
 from contextlib import asynccontextmanager
 from itertools import count
@@ -20,16 +21,30 @@ from lmdeploy.utils import _get_and_verify_max_len, _stop_words, get_logger
 
 logger = get_logger('lmdeploy')
 
+TOOL_TEMPLATE_DICT={
+    "qwen2-tooluse-base":"ke-model-20240827"
+}
 def get_names_from_model(model_path: str, model_name: str = None,base_model_type: Optional[str] = None):
     """Get model name and chat template name from workspace model."""
     from configparser import ConfigParser
     triton_model_path = os.path.join(model_path, 'triton_models', 'weights')
     if not os.path.exists(triton_model_path):
-        if base_model_type is not None:
-            chat_template_name = best_match_model(base_model_type)
-        else:
-            chat_template_name = best_match_model(model_path)
-        # chat_template_name = best_match_model(model_path)
+        chat_template_type=model_path
+
+        tool_template_type=os.getenv('TOOL_TEMPLATE_TYPE')
+        if tool_template_type in TOOL_TEMPLATE_DICT:
+            tool_template_type=TOOL_TEMPLATE_DICT[tool_template_type]
+
+        if tool_template_type is not None:
+            chat_template_type=tool_template_type
+        elif base_model_type is not None:
+            chat_template_type=base_model_type
+
+        # if base_model_type is not None:
+        #     chat_template_name = best_match_model(base_model_type)
+        # else:
+        #     chat_template_name = best_match_model(model_path)
+        chat_template_name = best_match_model(chat_template_type)
     else:
         # `model_path` refers to a turbomind model, reading
         # chat_template_name from the config
@@ -639,7 +654,12 @@ class AsyncEngine(LogitsMixin):
             action, _ = text.split('</function>')
             parameters = json.dumps(json.loads(action[action.find('{'):]))
             name = action.split('<function=')[1].split('>{')[0]
-        elif '<functioncall> ' in text: # qwen2-lixia
+        elif '<functioncall> ' in text and '</functioncall>' in text: # qwen2-tooluse-base
+            match = re.match(r"<functioncall>\s*(\w+)\s*(\{.*\})\s*</functioncall>", text)
+            if match:
+                name = match.group(1)
+                parameters = match.group(2)
+        elif '<functioncall> ' in text and '</functioncall>' not in text: # qwen2-lixia
             _,action=text.split('<functioncall> ')
             name=json.loads(action)['name']
             parameters=json.dumps(json.loads(action)['arguments'])

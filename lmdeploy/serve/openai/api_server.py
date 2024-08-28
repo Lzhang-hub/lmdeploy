@@ -485,7 +485,7 @@ async def chat_completions_v1(request: ChatCompletionRequest,
                     tool_calls=None,
                     finish_reason=res.finish_reason,
                     logprobs=logprobs)
-        return UnmarshalRes(response_json,first_return,last_return,name)
+        return UnmarshalRes(response_json,first_return,last_return,name,action_id)
 
     def unmarshal_qwen2_tool(res,tmp_prefix_result,first_return,last_return,name,action_id,logprobs):
         if res.finish_reason == 'stop':
@@ -537,20 +537,78 @@ async def chat_completions_v1(request: ChatCompletionRequest,
                         finish_reason=res.finish_reason,
                         logprobs=logprobs)
         return UnmarshalRes(response_json,first_return,last_return,name,action_id)
-  
+
+    def unmarshal_qwen2_tooluse_base_tool(res,tmp_prefix_result,first_return,last_return,name,action_id,logprobs):
+        if res.finish_reason == 'stop':
+            res.finish_reason = 'tool_calls'
+        
+        if '<functioncall>' in tmp_prefix_result and ' {"' in tmp_prefix_result:   
+            if name=="":
+                name = tmp_prefix_result.split('<functioncall> ')[1].split(' {"')[0]
+                action_id = [tool.function.name for tool in request.tools].index(name)
+        else:
+            return None
+
+        if not first_return:
+            # fisrt_arguments='{"'+tmp_prefix_result.split(' {"')[1]
+            tool_calls = [
+                ToolCall(index=str(action_id),
+                    id=str(action_id),
+                    function=FunctionResponse(name=name,arguments='{"'))]
+            response_json = create_stream_response_json(
+                    index=0,
+                    text='',
+                    tool_calls=tool_calls,
+                    finish_reason=res.finish_reason,
+                    logprobs=logprobs)
+            first_return=True
+        elif not last_return:
+            if tmp_prefix_result.endswith(' </'):
+                tool_response=res.response.split(' </')[0]
+                tool_calls = [
+                    ToolCallStream(index=str(action_id),function=FunctionStreamResponse(arguments=tool_response))]
+                response_json = create_stream_response_json(
+                        index=0,
+                        text='',
+                        tool_calls=tool_calls,
+                        finish_reason=res.finish_reason,
+                        logprobs=logprobs)
+                last_return=True
+            else:
+                # if tmp_prefix_result.endswith(' {"'):
+                #     res.text='{"'+res.text
+                tool_calls = [
+                    ToolCallStream(index=str(action_id),function=FunctionStreamResponse(arguments=res.response))]
+                response_json = create_stream_response_json(
+                        index=0,
+                        text='',
+                        tool_calls=tool_calls,
+                        finish_reason=res.finish_reason,
+                        logprobs=logprobs)
+        else:
+            response_json = create_stream_response_json(
+                    index=0,
+                    text=None,
+                    tool_calls=None,
+                    finish_reason=res.finish_reason,
+                    logprobs=logprobs)
+        return UnmarshalRes(response_json,first_return,last_return,name,action_id)
+
     async def completion_stream_generator() -> AsyncGenerator[str, None]:
         tmp_prefix_result=""
         init_unmarshal=UnmarshalRes("",False,False,"",None)
 
         # set tool stream unmarshal function according to TOOL_TEMPLATE_TYPE
         tool_template_type=os.getenv('TOOL_TEMPLATE_TYPE')
-        if tool_template_type!='' and tool_template_type not in ["llama3_1","qwen2"]:
-            yield create_error_response(HTTPStatus.BAD_REQUEST, "TOOL_TEMPLATE_TYPE must be llama3_1 or qwen2")
+        if tool_template_type!=None and tool_template_type not in ["llama3_1","qwen2","qwen2-tooluse-base"]:
+            yield create_error_response(HTTPStatus.BAD_REQUEST, "TOOL_TEMPLATE_TYPE must be in [llama3_1,qwen2,qwen2-tooluse-base]")
         unmarshal_func=None
         if tool_template_type=="llama3_1":
             unmarshal_func=unmarshal_llama3_1_tool
         elif tool_template_type=="qwen2":
             unmarshal_func=unmarshal_qwen2_tool
+        elif tool_template_type=="qwen2-tooluse-base":
+            unmarshal_func=unmarshal_qwen2_tooluse_base_tool
 
         async for res in result_generator:
             if res.finish_reason=='out_session':
@@ -1071,8 +1129,8 @@ def serve(model_path: str,
           api_keys: Optional[Union[List[str], str]] = None,
           ssl: bool = False,
           qos_config_path: str = '',
-          tool_template_type: str = '',
-          base_model_type: str = '',
+          tool_template_type: str = None,
+          base_model_type: str = None,
           **kwargs):
     """An example to perform model inference through the command line
     interface.

@@ -134,7 +134,7 @@ class SubCliServe:
                             help='Qos policy config path')
         parser.add_argument('--tool-template-type',
                             type=str,
-                            default='',
+                            default=None,
                             help='Tool call unmarshal template type'
         )
         parser.add_argument('--base-model-type',
