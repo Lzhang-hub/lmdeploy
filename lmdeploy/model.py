@@ -1049,6 +1049,8 @@ Reminder:
         # converstion_len=len(messages)
         for i, message in enumerate(messages):
             role = message['role']
+            if role=='tool':
+                role='user'
             content = message['content']
             if "tool_calls" in message:
                 for tool_call in message['tool_calls']:
