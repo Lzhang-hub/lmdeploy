@@ -1007,6 +1007,7 @@ Reminder:
         eoa='<|im_end|>',
         separator='\n',
         stop_words=['<|im_end|>'],
+        tool='<|im_start|>tool\n',
         **kwargs):
         super().__init__(system=system,
                          meta_instruction=meta_instruction,
@@ -1019,6 +1020,7 @@ Reminder:
                          stop_words=stop_words,
                          **kwargs)
         self.tools = tools
+        self.tool=tool
 
     def messages2prompt(self, messages, sequence_start=True, **kwargs):
         """Return the prompt that is concatenated with other elements in the
@@ -1033,14 +1035,16 @@ Reminder:
             return self.get_prompt(messages, sequence_start)
         box_map = dict(user=self.user,
                        assistant=self.assistant,
-                       system=self.system)
+                       system=self.system,
+                       tool=self.tool,)
         eox_map = dict(user=self.eoh,
                        assistant=self.eoa + self.separator,
-                       system=self.eosys)
+                       system=self.eosys,
+                       tool=self.eoh,)
         ret = ''
         tools=kwargs.get('tools')
         if tools is not None:
-            ret+=self.tools.replace("{functions}", "\n".join([json.dumps(x, ensure_ascii=False) for x in tools]))
+            ret+=self.system+self.tools.replace("{functions}", "\n".join([json.dumps(x, ensure_ascii=False) for x in tools]))+self.eosys
         else:
             if self.meta_instruction is not None and sequence_start:
                 if len(messages) and messages[0]['role'] != 'system':
@@ -1049,8 +1053,6 @@ Reminder:
         # converstion_len=len(messages)
         for i, message in enumerate(messages):
             role = message['role']
-            if role=='tool':
-                role='user'
             content = message['content']
             if "tool_calls" in message:
                 for tool_call in message['tool_calls']:
