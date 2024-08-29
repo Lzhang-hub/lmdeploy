@@ -17,6 +17,24 @@ def random_uuid() -> str:
     """Return a random uuid."""
     return str(uuid.uuid4().hex)
 
+def parse_old_tools(tool_list):
+    tool_save = []
+    try:
+        for tool in tool_list:
+            req_keys = []
+            if "required" in tool["parameters"].keys():
+                req_keys = tool["parameters"]["required"]
+            paras = tool["parameters"]["properties"]
+            for k in paras.keys():
+                if k in req_keys:
+                    paras[k]["required"] = True
+                else:
+                    paras[k]["required"] = False
+            mid = {"name":tool["name"], "description":tool["description"], "parameters":paras}
+            tool_save.append(mid)
+    except:
+        return None
+    return tool_save
 
 @dataclasses.dataclass
 class ChatTemplateConfig:
@@ -1043,8 +1061,11 @@ Reminder:
                        tool=self.eoh,)
         ret = ''
         tools=kwargs.get('tools')
+        new_tools=parse_old_tools(tools)
+        if new_tools is None:
+            new_tools=tools
         if tools is not None:
-            ret+=self.system+self.tools.replace("{functions}", "\n".join([json.dumps(x, ensure_ascii=False) for x in tools]))+self.eosys
+            ret+=self.system+self.tools.replace("{functions}", "\n".join([json.dumps(x, ensure_ascii=False) for x in new_tools]))+self.eosys
         else:
             if self.meta_instruction is not None and sequence_start:
                 if len(messages) and messages[0]['role'] != 'system':
