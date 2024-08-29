@@ -1054,7 +1054,7 @@ Reminder:
             content = message['content']
             if "tool_calls" in message:
                 for tool_call in message['tool_calls']:
-                    content=f'<functioncall> {tool_call["function"]["name"]} {json.dumps(json.loads(tool_call["function"]["arguments"]))}'
+                    content=f'<functioncall> {tool_call["function"]["name"]} {json.dumps(json.loads(tool_call["function"]["arguments"]))} </functioncall>'
                     # json.dumps({"arguments": json.loads(tool_call['function']['arguments'])})
                     # content= '<functioncall> {"name": '+tool_call["function"]["name"]}'
             ret += f'{box_map[role]}{content}{eox_map[role]}'

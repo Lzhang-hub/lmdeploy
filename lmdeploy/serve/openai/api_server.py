@@ -673,12 +673,12 @@ async def chat_completions_v1(request: ChatCompletionRequest,
     if request.tool_choice != 'none' and ('<|plugin|>' in text
                                           or '<function=' in text
                                           or '<functioncall>' in text):
+        logger.info(f'raw res text is: {text}')
         if final_res.finish_reason == 'stop':
             final_res.finish_reason = 'tool_calls'
         try:  # TODO add json_schema guidance to turbomind
             text, action_id, name, parameters = VariableInterface.async_engine.parse_tool_response(  # noqa
                 text, request.tools)
-            print(f'zldebug: {type(parameters)}')
             tool_calls = [
                 ToolCall(index=str(action_id),id=str(action_id),
                          function=FunctionResponse(name=name,
