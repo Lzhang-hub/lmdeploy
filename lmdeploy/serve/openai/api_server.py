@@ -542,19 +542,19 @@ async def chat_completions_v1(request: ChatCompletionRequest,
         if res.finish_reason == 'stop':
             res.finish_reason = 'tool_calls'
         
-        if '<functioncall>' in tmp_prefix_result and ' {"' in tmp_prefix_result:   
+        if '<functioncall>' in tmp_prefix_result and ' {' in tmp_prefix_result:   
             if name=="":
-                name = tmp_prefix_result.split('<functioncall> ')[1].split(' {"')[0]
+                name = tmp_prefix_result.split('<functioncall> ')[1].split(' {')[0]
                 action_id = [tool.function.name for tool in request.tools].index(name)
         else:
             return None
 
         if not first_return:
-            # fisrt_arguments='{"'+tmp_prefix_result.split(' {"')[1]
+            fisrt_arguments=tmp_prefix_result.split(name+' ')[1]
             tool_calls = [
                 ToolCall(index=str(action_id),
                     id=str(action_id),
-                    function=FunctionResponse(name=name,arguments='{"'))]
+                    function=FunctionResponse(name=name,arguments=fisrt_arguments))]
             response_json = create_stream_response_json(
                     index=0,
                     text='',
