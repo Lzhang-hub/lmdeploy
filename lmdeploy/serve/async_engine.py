@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 from lmdeploy.messages import (EngineGenerationConfig, GenerationConfig,
                                PytorchEngineConfig, Response,
                                TurbomindEngineConfig)
-from lmdeploy.model import MODELS, ChatTemplateConfig, best_match_model
+from lmdeploy.model import MODELS, ChatTemplateConfig, best_match_model,register_ke_model
 from lmdeploy.serve.utils import LogitsMixin, _get_event_loop
 from lmdeploy.tokenizer import DetokenizeState
 from lmdeploy.utils import _get_and_verify_max_len, _stop_words, get_logger
@@ -36,6 +36,7 @@ def get_names_from_model(model_path: str, model_name: str = None,base_model_type
             tool_template_type=TOOL_TEMPLATE_DICT[tool_template_type]
 
         if tool_template_type is not None:
+            register_ke_model()
             chat_template_type=tool_template_type
         elif base_model_type is not None:
             chat_template_type=base_model_type

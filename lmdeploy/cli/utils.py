@@ -1,6 +1,7 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 
 import argparse
+import os
 from typing import List
 
 
@@ -463,3 +464,7 @@ class ArgumentHelper:
                                    type=int,
                                    default=1,
                                    help='the vision model batch size')
+
+def judge_file_exist_in_dir(file_name, dir_path):
+    """Check if a file exists in a directory."""
+    return os.path.isfile(os.path.join(dir_path, file_name))

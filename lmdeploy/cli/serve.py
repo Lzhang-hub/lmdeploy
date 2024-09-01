@@ -1,7 +1,8 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 from .cli import CLI
 from .utils import (ArgumentHelper, DefaultsAndTypesHelpFormatter,
-                    convert_args, get_chat_template, get_lora_adapters)
+                    convert_args, get_chat_template, get_lora_adapters,
+                    judge_file_exist_in_dir)
 
 
 class SubCliServe:
@@ -134,7 +135,7 @@ class SubCliServe:
                             help='Qos policy config path')
         parser.add_argument('--tool-template-type',
                             type=str,
-                            default=None,
+                            default='',
                             help='Tool call unmarshal template type'
         )
         parser.add_argument('--base-model-type',
@@ -261,6 +262,9 @@ class SubCliServe:
         if backend != 'pytorch':
             # set auto backend mode
             backend = autoget_backend(args.model_path)
+        
+        if args.tool_template_type !='' and not judge_file_exist_in_dir("model_generate_utils.py",args.model_path):
+            raise ValueError("tool_template_type is not empty, but model_generate_utils.py not found in model_path")
 
         if backend == 'pytorch':
             from lmdeploy.messages import PytorchEngineConfig

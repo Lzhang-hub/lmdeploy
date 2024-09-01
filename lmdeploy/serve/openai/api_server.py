@@ -3,6 +3,7 @@ import asyncio
 import copy
 import os
 import json
+import sys
 import time
 import dataclasses
 from functools import partial
@@ -538,61 +539,61 @@ async def chat_completions_v1(request: ChatCompletionRequest,
                         logprobs=logprobs)
         return UnmarshalRes(response_json,first_return,last_return,name,action_id)
 
-    def unmarshal_qwen2_tooluse_base_tool(res,tmp_prefix_result,first_return,last_return,name,action_id,logprobs):
-        if res.finish_reason == 'stop':
-            res.finish_reason = 'tool_calls'
+    # def unmarshal_qwen2_tooluse_base_tool(res,tmp_prefix_result,first_return,last_return,name,action_id,logprobs):
+    #     if res.finish_reason == 'stop':
+    #         res.finish_reason = 'tool_calls'
         
-        if '<functioncall>' in tmp_prefix_result and ' {' in tmp_prefix_result:   
-            if name=="":
-                name = tmp_prefix_result.split('<functioncall> ')[1].split(' {')[0]
-                action_id = [tool.function.name for tool in request.tools].index(name)
-        else:
-            return None
+    #     if '<functioncall>' in tmp_prefix_result and ' {' in tmp_prefix_result:   
+    #         if name=="":
+    #             name = tmp_prefix_result.split('<functioncall> ')[1].split(' {')[0]
+    #             action_id = [tool.function.name for tool in request.tools].index(name)
+    #     else:
+    #         return None
 
-        if not first_return:
-            fisrt_arguments=tmp_prefix_result.split(name+' ')[1]
-            tool_calls = [
-                ToolCall(index=str(action_id),
-                    id=str(action_id),
-                    function=FunctionResponse(name=name,arguments=fisrt_arguments))]
-            response_json = create_stream_response_json(
-                    index=0,
-                    text='',
-                    tool_calls=tool_calls,
-                    finish_reason=res.finish_reason,
-                    logprobs=logprobs)
-            first_return=True
-        elif not last_return:
-            if tmp_prefix_result.endswith(' </'):
-                tool_response=res.response.split(' </')[0]
-                tool_calls = [
-                    ToolCallStream(index=str(action_id),function=FunctionStreamResponse(arguments=tool_response))]
-                response_json = create_stream_response_json(
-                        index=0,
-                        text='',
-                        tool_calls=tool_calls,
-                        finish_reason=res.finish_reason,
-                        logprobs=logprobs)
-                last_return=True
-            else:
-                # if tmp_prefix_result.endswith(' {"'):
-                #     res.text='{"'+res.text
-                tool_calls = [
-                    ToolCallStream(index=str(action_id),function=FunctionStreamResponse(arguments=res.response))]
-                response_json = create_stream_response_json(
-                        index=0,
-                        text='',
-                        tool_calls=tool_calls,
-                        finish_reason=res.finish_reason,
-                        logprobs=logprobs)
-        else:
-            response_json = create_stream_response_json(
-                    index=0,
-                    text=None,
-                    tool_calls=None,
-                    finish_reason=res.finish_reason,
-                    logprobs=logprobs)
-        return UnmarshalRes(response_json,first_return,last_return,name,action_id)
+    #     if not first_return:
+    #         fisrt_arguments=tmp_prefix_result.split(name+' ')[1]
+    #         tool_calls = [
+    #             ToolCall(index=str(action_id),
+    #                 id=str(action_id),
+    #                 function=FunctionResponse(name=name,arguments=fisrt_arguments))]
+    #         response_json = create_stream_response_json(
+    #                 index=0,
+    #                 text='',
+    #                 tool_calls=tool_calls,
+    #                 finish_reason=res.finish_reason,
+    #                 logprobs=logprobs)
+    #         first_return=True
+    #     elif not last_return:
+    #         if tmp_prefix_result.endswith(' </'):
+    #             tool_response=res.response.split(' </')[0]
+    #             tool_calls = [
+    #                 ToolCallStream(index=str(action_id),function=FunctionStreamResponse(arguments=tool_response))]
+    #             response_json = create_stream_response_json(
+    #                     index=0,
+    #                     text='',
+    #                     tool_calls=tool_calls,
+    #                     finish_reason=res.finish_reason,
+    #                     logprobs=logprobs)
+    #             last_return=True
+    #         else:
+    #             # if tmp_prefix_result.endswith(' {"'):
+    #             #     res.text='{"'+res.text
+    #             tool_calls = [
+    #                 ToolCallStream(index=str(action_id),function=FunctionStreamResponse(arguments=res.response))]
+    #             response_json = create_stream_response_json(
+    #                     index=0,
+    #                     text='',
+    #                     tool_calls=tool_calls,
+    #                     finish_reason=res.finish_reason,
+    #                     logprobs=logprobs)
+    #     else:
+    #         response_json = create_stream_response_json(
+    #                 index=0,
+    #                 text=None,
+    #                 tool_calls=None,
+    #                 finish_reason=res.finish_reason,
+    #                 logprobs=logprobs)
+    #     return UnmarshalRes(response_json,first_return,last_return,name,action_id)
 
     async def completion_stream_generator() -> AsyncGenerator[str, None]:
         tmp_prefix_result=""
@@ -600,14 +601,14 @@ async def chat_completions_v1(request: ChatCompletionRequest,
 
         # set tool stream unmarshal function according to TOOL_TEMPLATE_TYPE
         tool_template_type=os.getenv('TOOL_TEMPLATE_TYPE')
-        if tool_template_type!=None and tool_template_type not in ["llama3_1","qwen2","qwen2-tooluse-base"]:
+        if tool_template_type!=None and tool_template_type not in ["qwen2-tooluse-base"]:
             yield create_error_response(HTTPStatus.BAD_REQUEST, "TOOL_TEMPLATE_TYPE must be in [llama3_1,qwen2,qwen2-tooluse-base]")
+        try:
+            from model_generate_utils import unmarshal_qwen2_tooluse_base_tool
+        except:
+            raise Exception("unmarshal_qwen2_tooluse_base_tool can not find in model_generate_utils")
         unmarshal_func=None
-        if tool_template_type=="llama3_1":
-            unmarshal_func=unmarshal_llama3_1_tool
-        elif tool_template_type=="qwen2":
-            unmarshal_func=unmarshal_qwen2_tool
-        elif tool_template_type=="qwen2-tooluse-base":
+        if tool_template_type=="qwen2-tooluse-base":
             unmarshal_func=unmarshal_qwen2_tooluse_base_tool
 
         async for res in result_generator:
@@ -624,7 +625,7 @@ async def chat_completions_v1(request: ChatCompletionRequest,
             if request.tool_choice != 'none' and tmp_prefix_result.startswith('<') and unmarshal_func!=None:
                 # model_unmarshal_res=unmarshal_llama3_1_tool(res,tmp_prefix_result,unmarshal_res.first_return,unmarshal_res.last_return,unmarshal_res.name,init_unmarshal.action_id,logprobs)
                 
-                model_unmarshal_res=unmarshal_func(res,tmp_prefix_result,init_unmarshal.first_return,init_unmarshal.last_return,init_unmarshal.name,init_unmarshal.action_id,logprobs)
+                model_unmarshal_res=unmarshal_func(res,request,created_time,tmp_prefix_result,init_unmarshal.first_return,init_unmarshal.last_return,init_unmarshal.name,init_unmarshal.action_id,logprobs)
                 # logger.info(model_unmarshal_res)
                 if model_unmarshal_res!=None:
                     response_json=model_unmarshal_res.response_json
@@ -1173,7 +1174,10 @@ def serve(model_path: str,
     if os.getenv('TM_LOG_LEVEL') is None:
         os.environ['TM_LOG_LEVEL'] = log_level
     logger.setLevel(log_level)
-    os.environ['TOOL_TEMPLATE_TYPE'] = tool_template_type
+    if tool_template_type!='':
+        os.environ['TOOL_TEMPLATE_TYPE'] = tool_template_type
+        sys.path.append(model_path)
+
 
     if allow_origins:
         app.add_middleware(

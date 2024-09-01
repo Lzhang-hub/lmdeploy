@@ -990,109 +990,108 @@ class Qwen7BChat(BaseChatTemplate):
         if 'minicpm-v-2_6' in model_path.lower():
             return 'minicpmv-2d6'
 
-@MODELS.register_module(name='ke-model-20240827')
-class KeModel20240827(BaseChatTemplate):
-    """Chat template of Qwem2ToolUseBase model."""
+# class KeModel20240827(BaseChatTemplate):
+#     """Chat template of Qwem2ToolUseBase model."""
 
-    def __init__(
-            self,
-            tools="""You are a helpful assistant.You have access to the following functions:
-{functions}
-If a you choose to call a function ONLY reply in the following format:
-{start_tag}{function_name}{parameters}{end_tag}
-where:
-start_tag => `<functioncall>`
-function_name => name of the function
-parameters => a JSON dict with the function argument name as key and function argument value as value.
-end_tag => `</functioncall>`
+#     def __init__(
+#             self,
+#             tools="""You are a helpful assistant.You have access to the following functions:
+# {functions}
+# If a you choose to call a function ONLY reply in the following format:
+# {start_tag}{function_name}{parameters}{end_tag}
+# where:
+# start_tag => `<functioncall>`
+# function_name => name of the function
+# parameters => a JSON dict with the function argument name as key and function argument value as value.
+# end_tag => `</functioncall>`
 
-Here is an example:
-<functioncall> eaxmple_function_name {"example_arguments": "example_value"} </functioncall>
+# Here is an example:
+# <functioncall> eaxmple_function_name {"example_arguments": "example_value"} </functioncall>
 
-Reminder:
-- Function calls MUST follow the specified format
-- Required parameters MUST be specified
-- Only call one function at a time
-- Put the entire function call reply on one line
-- Always add your sources when using search results to answer the user query
-""",  # noqa
-        system='<|im_start|>system\n',
-        meta_instruction='You are a helpful assistant.',
-        eosys='<|im_end|>\n',
-        user='<|im_start|>user\n',
-        eoh='<|im_end|>\n',
-        assistant='<|im_start|>assistant\n',
-        eoa='<|im_end|>',
-        separator='\n',
-        stop_words=['<|im_end|>'],
-        tool='<|im_start|>tool\n',
-        **kwargs):
-        super().__init__(system=system,
-                         meta_instruction=meta_instruction,
-                         eosys=eosys,
-                         user=user,
-                         eoh=eoh,
-                         assistant=assistant,
-                         eoa=eoa,
-                         separator=separator,
-                         stop_words=stop_words,
-                         **kwargs)
-        self.tools = tools
-        self.tool=tool
+# Reminder:
+# - Function calls MUST follow the specified format
+# - Required parameters MUST be specified
+# - Only call one function at a time
+# - Put the entire function call reply on one line
+# - Always add your sources when using search results to answer the user query
+# """,  # noqa
+#         system='<|im_start|>system\n',
+#         meta_instruction='You are a helpful assistant.',
+#         eosys='<|im_end|>\n',
+#         user='<|im_start|>user\n',
+#         eoh='<|im_end|>\n',
+#         assistant='<|im_start|>assistant\n',
+#         eoa='<|im_end|>',
+#         separator='\n',
+#         stop_words=['<|im_end|>'],
+#         tool='<|im_start|>tool\n',
+#         **kwargs):
+#         super().__init__(system=system,
+#                          meta_instruction=meta_instruction,
+#                          eosys=eosys,
+#                          user=user,
+#                          eoh=eoh,
+#                          assistant=assistant,
+#                          eoa=eoa,
+#                          separator=separator,
+#                          stop_words=stop_words,
+#                          **kwargs)
+#         self.tools = tools
+#         self.tool=tool
 
-    def messages2prompt(self, messages, sequence_start=True, **kwargs):
-        """Return the prompt that is concatenated with other elements in the
-        chat template.
+#     def messages2prompt(self, messages, sequence_start=True, **kwargs):
+#         """Return the prompt that is concatenated with other elements in the
+#         chat template.
 
-        Args:
-            messages (str | List): user's input prompt
-        Returns:
-            str: the concatenated prompt
-        """
-        if isinstance(messages, str):
-            return self.get_prompt(messages, sequence_start)
-        box_map = dict(user=self.user,
-                       assistant=self.assistant,
-                       system=self.system,
-                       tool=self.tool,)
-        eox_map = dict(user=self.eoh,
-                       assistant=self.eoa + self.separator,
-                       system=self.eosys,
-                       tool=self.eoh,)
-        ret = ''
-        tools=kwargs.get('tools')
-        new_tools=parse_old_tools(tools)
-        if new_tools is None:
-            new_tools=tools
-        if tools is not None:
-            ret+=self.system+self.tools.replace("{functions}", "\n".join([json.dumps(x, ensure_ascii=False) for x in new_tools]))+self.eosys
-        else:
-            if self.meta_instruction is not None and sequence_start:
-                if len(messages) and messages[0]['role'] != 'system':
-                    ret += f'{self.system}{self.meta_instruction}{self.eosys}'
+#         Args:
+#             messages (str | List): user's input prompt
+#         Returns:
+#             str: the concatenated prompt
+#         """
+#         if isinstance(messages, str):
+#             return self.get_prompt(messages, sequence_start)
+#         box_map = dict(user=self.user,
+#                        assistant=self.assistant,
+#                        system=self.system,
+#                        tool=self.tool,)
+#         eox_map = dict(user=self.eoh,
+#                        assistant=self.eoa + self.separator,
+#                        system=self.eosys,
+#                        tool=self.eoh,)
+#         ret = ''
+#         tools=kwargs.get('tools')
+#         new_tools=parse_old_tools(tools)
+#         if new_tools is None:
+#             new_tools=tools
+#         if tools is not None:
+#             ret+=self.system+self.tools.replace("{functions}", "\n".join([json.dumps(x, ensure_ascii=False) for x in new_tools]))+self.eosys
+#         else:
+#             if self.meta_instruction is not None and sequence_start:
+#                 if len(messages) and messages[0]['role'] != 'system':
+#                     ret += f'{self.system}{self.meta_instruction}{self.eosys}'
 
-        # converstion_len=len(messages)
-        for i, message in enumerate(messages):
-            role = message['role']
-            content = message['content']
-            if "tool_calls" in message:
-                for tool_call in message['tool_calls']:
-                    content=f'<functioncall> {tool_call["function"]["name"]} {json.dumps(json.loads(tool_call["function"]["arguments"]))} </functioncall>'
-                    # json.dumps({"arguments": json.loads(tool_call['function']['arguments'])})
-                    # content= '<functioncall> {"name": '+tool_call["function"]["name"]}'
-            ret += f'{box_map[role]}{content}{eox_map[role]}'
-        ret += f'{self.assistant}'
-        return ret
+#         # converstion_len=len(messages)
+#         for i, message in enumerate(messages):
+#             role = message['role']
+#             content = message['content']
+#             if "tool_calls" in message:
+#                 for tool_call in message['tool_calls']:
+#                     content=f'<functioncall> {tool_call["function"]["name"]} {json.dumps(json.loads(tool_call["function"]["arguments"]))} </functioncall>'
+#                     # json.dumps({"arguments": json.loads(tool_call['function']['arguments'])})
+#                     # content= '<functioncall> {"name": '+tool_call["function"]["name"]}'
+#             ret += f'{box_map[role]}{content}{eox_map[role]}'
+#         ret += f'{self.assistant}'
+#         return ret
 
-    @classmethod
-    def match(cls, model_path: str) -> Optional[str]:
-        """Return the model_name that was registered to MODELS.
+#     @classmethod
+#     def match(cls, model_path: str) -> Optional[str]:
+#         """Return the model_name that was registered to MODELS.
 
-        Args:
-            model_path (str): the model path used for matching.
-        """
-        if 'ke-model-20240827' in model_path.lower():
-            return 'ke-model-20240827'
+#         Args:
+#             model_path (str): the model path used for matching.
+#         """
+#         if 'ke-model-20240827' in model_path.lower():
+#             return 'ke-model-20240827'
      
 @MODELS.register_module(name='codellama')
 class CodeLlama(Llama2):
@@ -1888,6 +1887,30 @@ class InternVLPhi3(Phi3Instruct):
         if all([c in path for c in ['mini-internvl-chat', '4b', 'v1-5']]):
             return 'internvl-phi3'
 
+def register_ke_model():
+    try:
+        from model_generate_utils import KeModelBase
+        logger.info('Load model_generate_utils from remote code successfully.')
+    except ImportError:
+        logger.error('Cannot import model_generate_utils, please check the model_path exsit model_generate_utils.py .')
+        raise ImportError("KeModelBase could not be imported.")
+
+    @MODELS.register_module(name='ke-model-20240827')
+    class KeModel20240827(KeModelBase):
+        """Chat template of Qwem2ToolUseBase model."""
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+
+        @classmethod
+        def match(cls, model_path: str) -> Optional[str]:
+            """Return the model_name that was registered to MODELS.
+
+            Args:
+                model_path (str): the model path used for matching.
+            """
+            if 'ke-model-20240827' in model_path.lower():
+                return 'ke-model-20240827'
 
 def best_match_model(query: str) -> Optional[str]:
     """Get the model that matches the query.
@@ -1899,6 +1922,7 @@ def best_match_model(query: str) -> Optional[str]:
         str: the possible model name.
     """
     for name, model in MODELS.module_dict.items():
+        print(name)
         if model.match(query):
             return model.match(query)
     return 'base'
